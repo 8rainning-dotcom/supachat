@@ -148,10 +148,37 @@ const fmtTime = (isoString) => {
   } catch { return ''; }
 };
 const otherEmailOf = (email)=> email===USER_A ? USER_B : USER_A;
-const autolink = (txt='')=>{
+const autolink = (txt='') => {
+  // 📺 1. ดักจับลิงก์ YouTube (รองรับทั้งลิงก์สั้น youtu.be และลิงก์ยาว youtube.com)
+  const ytMatch = txt.match(/(?:youtu\.be\/|youtube\.com\/(?:.*v=|.*\/shorts\/))([a-zA-Z0-9_-]{11})/);
+  if (ytMatch) {
+    const vidId = ytMatch[1];
+    return `
+      <div class="mt-1">
+        <iframe class="w-full max-w-sm h-48 rounded-xl shadow-sm" src="https://www.youtube.com/embed/${vidId}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+      </div>
+      <a href="${txt}" target="_blank" rel="noopener" class="underline text-[11px] text-blue-500 mt-1 block break-all opacity-80">${txt}</a>
+    `;
+  }
+
+  // 🎵 2. ดักจับลิงก์ TikTok (รองรับลิงก์เต็มรูปแบบ)
+  const ttMatch = txt.match(/tiktok\.com\/.*\/video\/(\d+)/);
+  if (ttMatch) {
+    const vidId = ttMatch[1];
+    return `
+      <div class="mt-1">
+        <iframe class="w-full max-w-sm h-[400px] rounded-xl shadow-sm" src="https://www.tiktok.com/embed/v2/${vidId}" frameborder="0" allowfullscreen></iframe>
+      </div>
+      <a href="${txt}" target="_blank" rel="noopener" class="underline text-[11px] text-blue-500 mt-1 block break-all opacity-80">${txt}</a>
+    `;
+  }
+
+  // 🔗 3. ถ้าเป็นข้อความทั่วไป หรือลิงก์เว็บอื่นๆ ให้ทำเป็นตัวหนังสือสีฟ้ากดได้เหมือนเดิมค่ะ
   const urlRe=/((https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w\-._~:/?#[\]@!$&'()*+,;=%]*)?)/gi;
-  return txt.replace(urlRe,(m)=>{const url=m.startsWith('http')?m:('https://'+m);
-    return `<a href="${url}" target="_blank" rel="noopener" class="underline text-blue-600 break-words">${m}</a>`;});
+  return txt.replace(urlRe,(m)=>{
+    const url=m.startsWith('http')?m:('https://'+m);
+    return `<a href="${url}" target="_blank" rel="noopener" class="underline text-blue-600 break-words">${m}</a>`;
+  });
 };
 const list = document.getElementById('list');
 const isAtBottom = ()=> list.scrollTop + list.clientHeight >= list.scrollHeight - 30;
