@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <title>SupaChat • 2 คน</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    :root { --bg: #f6f8fc; --pri: #7c3aed; }
+    html { -webkit-text-size-adjust: 100%; }
+    html, body { margin: 0; background: var(--bg); font-family: system-ui, -apple-system, "Prompt", sans-serif; overflow: hidden; overscroll-behavior-y: none; }
+    
+    .safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+    .scroll { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+    .msg a { text-decoration: underline; word-break: break-all; }
+    
+    #videoBox video { max-height: 38vh; object-fit: cover; }
+  </style>
+</head>
+<body class="h-[100dvh] w-screen text-slate-800 flex flex-col">
+
+<div id="uiModal" class="fixed inset-0 bg-slate-900/40 z-50 hidden flex items-center justify-center p-4 transition-opacity duration-300">
+  <div class="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 transform transition-all scale-95 opacity-0" id="uiModalBox">
+    <div id="uiModalTitle" class="text-lg font-bold mb-2">แจ้งเตือน</div>
+    <div id="uiModalBody" class="text-slate-600 mb-6 text-sm whitespace-pre-line"></div>
+    <div class="flex justify-end gap-3">
+      <button id="uiModalCancel" class="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl text-sm font-medium hidden hover:bg-slate-200">ยกเลิก</button>
+      <button id="uiModalOk" class="px-4 py-2 bg-[var(--pri)] text-white rounded-xl text-sm font-medium hover:opacity-90">ตกลง</button>
+    </div>
+  </div>
+</div>
+
+<section id="loginPage" class="h-full w-full flex items-center justify-center p-4 overflow-y-auto">
+  <div class="w-full max-w-sm bg-white rounded-3xl shadow-lg p-8">
+    <h1 class="text-2xl font-bold text-center text-slate-800">เข้าสู่ระบบ</h1>
+    <p class="text-sm text-slate-500 text-center mb-6 mt-1">...Supabase Database...</p>
+
+    <label class="block text-sm font-medium mb-1 text-slate-700">อีเมล</label>
+    <input id="email" type="email" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 mb-4 text-base focus:border-[var(--pri)] focus:outline-none transition-colors" placeholder="you@example.com">
+
+    <label class="block text-sm font-medium mb-1 text-slate-700">รหัสผ่าน</label>
+    <input id="password" type="password" class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 mb-6 text-base focus:border-[var(--pri)] focus:outline-none transition-colors" placeholder="••••••••">
+
+    <button id="loginBtn" class="w-full py-3.5 bg-[var(--pri)] text-white font-medium rounded-xl hover:opacity-90 transition-opacity flex justify-center items-center gap-2">
+      <span id="loginText">เข้าสู่ระบบ</span>
+    </button>
+  </div>
+</section>
+
+<section id="chatPage" class="h-full w-full hidden flex-col">
+  <div class="px-3 py-1.5 bg-white/95 backdrop-blur-sm shadow-sm border-b flex items-center justify-between z-10 flex-shrink-0">
+    <div>
+      <div class="text-[15px] font-bold text-slate-800 leading-tight">รักกันนะคะ</div>
+      <div id="meId" class="text-[10px] text-slate-500 leading-tight mt-0.5"></div>
+    </div>
+    <div class="flex items-center gap-1.5">
+      <button id="btnVoiceCall" class="px-2 py-1 md:px-3 md:py-1.5 text-[11px] font-medium bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200">📞 เสียง</button>
+      <button id="btnVideoCall" class="px-2 py-1 md:px-3 md:py-1.5 text-[11px] font-medium bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200">📹 วิดีโอ</button>
+      <button id="btnHangup"    class="px-2 py-1 md:px-3 md:py-1.5 text-[11px] font-medium bg-rose-500 text-white rounded-lg hidden">☎️ วางสาย</button>
+      <button id="logoutBtn" class="px-2 py-1 md:px-3 md:py-1.5 text-[11px] font-medium bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200">ออก</button>
+    </div>
+  </div>
+
+  <div id="callStatus" class="hidden absolute top-16 left-0 right-0 z-20 flex justify-center pointer-events-none">
+    <div id="callStatusMsg" class="px-4 py-2 rounded-full text-white text-xs font-medium shadow-md"></div>
+  </div>
+
+  <div id="videoBox" class="w-full bg-slate-900 hidden flex-shrink-0">
+    <div class="p-3 grid grid-cols-2 gap-3 items-center">
+      <video id="localVideo"  class="w-full rounded-xl bg-black shadow-inner" autoplay playsinline muted></video>
+      <video id="remoteVideo" class="w-full rounded-xl bg-black shadow-inner" autoplay playsinline></video>
+    </div>
+    <div class="px-3 pb-3 flex justify-center gap-3">
+      <button id="btnMute" class="px-4 py-2 rounded-full bg-white/20 text-white text-sm backdrop-blur-sm">ไมค์ เปิด</button>
+      <button id="btnCam"  class="px-4 py-2 rounded-full bg-white/20 text-white text-sm backdrop-blur-sm">กล้อง ปิด</button>
+    </div>
+  </div>
+
+  <div id="list" class="flex-1 scroll px-4 py-4 flex flex-col gap-2 w-full bg-[url('https://zxxzcsusrexrweepmhog.supabase.co/storage/v1/object/public/chat-media/background/IMG_09981.jpg')] bg-cover bg-center bg-no-repeat bg-fixed"></div>
+
+  <div class="bg-white/95 backdrop-blur-sm safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10 w-full flex-shrink-0">
+    <div class="px-3 py-1.5 flex items-center gap-2 border-b border-slate-100 overflow-x-auto whitespace-nowrap">
+      <input id="fileCamera" type="file" accept="image/*,video/*" capture class="hidden" />
+      <button id="btnCamera" class="px-2.5 py-1 bg-slate-100 text-slate-600 text-[12px] font-medium rounded-lg hover:bg-slate-200 flex-shrink-0">📸 ถ่ายรูป</button>
+
+      <input id="fileLibrary" type="file" accept="image/*,video/*" class="hidden" />
+      <button id="btnLibrary" class="px-2.5 py-1 bg-slate-100 text-slate-600 text-[12px] font-medium rounded-lg hover:bg-slate-200 flex-shrink-0">🖼️ เลือกคลัง</button>
+
+      <label class="text-[11px] text-slate-500 flex items-center gap-1.5 ml-auto cursor-pointer flex-shrink-0">
+        <input id="notifyChk" type="checkbox" class="w-3.5 h-3.5 accent-[var(--pri)] rounded">
+        ส่งอีเมลเตือน
+      </label>
+    </div>
+
+    <div class="px-3 py-1.5 flex items-center gap-2">
+      <input id="text" type="text" class="flex-1 w-full border-2 border-slate-200 rounded-xl px-3 py-1.5 text-base focus:border-[var(--pri)] focus:outline-none transition-colors" placeholder="พิมพ์ข้อความ...">
+      <button id="sendBtn" class="bg-[var(--pri)] text-white text-sm font-medium px-4 py-1.5 rounded-xl hover:opacity-90 transition-opacity flex-shrink-0">ส่ง</button>
+    </div>
+  </div>
+</section>
+
+<script>
+/* ========== 1) ตั้งค่า Supabase ========== */
+const SUPABASE_URL = 'https://zxxzcsusrexrweepmhog.supabase.co'; 
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp4eHpjc3VzcmV4cndlZXBtaG9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2ODI4NzYsImV4cCI6MjA5NzI1ODg3Nn0.tUq_tT4uD_B44UKgAyKWdEfACuTPxrM9e7jhu3L1Njs'; 
+
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const ROOM_ID = "room-two-people-001";
+const USER_A = "8rainning@gmail.com";
+const USER_B = "woonjantra@gmail.com";
+
+let currentUser = null;
+
+/* ========== 2) Helpers & UI Modal ========== */
+const uiModal = document.getElementById('uiModal');
+const uiModalBox = document.getElementById('uiModalBox');
+const uiTitle = document.getElementById('uiModalTitle');
+const uiBody = document.getElementById('uiModalBody');
+const uiBtnOk = document.getElementById('uiModalOk');
+const uiBtnCancel = document.getElementById('uiModalCancel');
+
+function showModal(msg, title = 'แจ้งเตือน', isConfirm = false) {
+  return new Promise((resolve) => {
+    uiTitle.textContent = title;
+    uiBody.textContent = msg;
+    uiModal.classList.remove('hidden');
+    setTimeout(() => { uiModalBox.classList.remove('scale-95', 'opacity-0'); uiModalBox.classList.add('scale-100', 'opacity-100'); }, 10);
+    if (isConfirm) uiBtnCancel.classList.remove('hidden'); else uiBtnCancel.classList.add('hidden');
+    const cleanup = () => {
+      uiModalBox.classList.remove('scale-100', 'opacity-100'); uiModalBox.classList.add('scale-95', 'opacity-0');
+      setTimeout(() => uiModal.classList.add('hidden'), 300);
+      uiBtnOk.onclick = null; uiBtnCancel.onclick = null;
+    };
+    uiBtnOk.onclick = () => { cleanup(); resolve(true); };
+    uiBtnCancel.onclick = () => { cleanup(); resolve(false); };
+  });
+}
+
+const fmtTime = (isoString) => {
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', hour12: false });
+  } catch { return ''; }
+};
+const otherEmailOf = (email)=> email===USER_A ? USER_B : USER_A;
+const autolink = (txt='')=>{
+  const urlRe=/((https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w\-._~:/?#[\]@!$&'()*+,;=%]*)?)/gi;
+  return txt.replace(urlRe,(m)=>{const url=m.startsWith('http')?m:('https://'+m);
+    return `<a href="${url}" target="_blank" rel="noopener" class="underline text-blue-600 break-words">${m}</a>`;});
+};
+const list = document.getElementById('list');
+const isAtBottom = ()=> list.scrollTop + list.clientHeight >= list.scrollHeight - 30;
+
+let scrollTimer = null;
+function scrollToLatest(smooth = true){
+  if(!list) return;
+  clearTimeout(scrollTimer);
+  scrollTimer = setTimeout(() => {
+    const goBottom = () => {
+      if(!list) return;
+      if (smooth) list.scrollTo({ top: list.scrollHeight, behavior: 'smooth' });
+      else list.scrollTop = list.scrollHeight;
+    };
+    goBottom();
+    setTimeout(goBottom, 300); setTimeout(goBottom, 800);
+  }, 50); 
+}
+
+/* ========== 3) ระบบ Login / Logout ========== */
+const loginBtn = document.getElementById('loginBtn');
+const emailEl = document.getElementById('email');
+const passEl = document.getElementById('password');
+
+loginBtn.addEventListener('click', async ()=>{
+  const email = emailEl.value.trim().toLowerCase();
+  const pass = passEl.value;
+  
+  if(!email || !pass) return showModal('กรุณากรอกอีเมลและรหัสผ่านให้ครบถ้วนค่ะ');
+
+  document.getElementById('loginText').textContent = 'กำลังเข้าสู่ระบบ...';
+  loginBtn.disabled = true;
+
+  try {
+    const { data, error } = await supa.auth.signInWithPassword({ email, password: pass });
+    if(error) {
+      showModal(`เข้าสู่ระบบไม่สำเร็จ: ${error.message}`, 'ข้อผิดพลาด');
+      document.getElementById('loginText').textContent = 'เข้าสู่ระบบ';
+      loginBtn.disabled = false;
+      return; 
+    }
+  } catch (err) {
+    showModal('เกิดข้อผิดพลาดในการเชื่อมต่อ กรุณาลองใหม่อีกครั้งนะคะ', 'ข้อผิดพลาด');
+    document.getElementById('loginText').textContent = 'เข้าสู่ระบบ';
+    loginBtn.disabled = false;
+  }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  const confirmOut = await showModal('ต้องการออกจากระบบใช่ไหมคะ?', 'ยืนยัน', true);
+  if(confirmOut) {
+    await supa.auth.signOut();
+    window.location.reload();
+  }
+});
+
+/* ========== 4) จัดการสถานะและดึงข้อความ (Realtime) ========== */
+let currentLimit = 40;
+let channel = null;
+const nodeMap = new Map();
+
+supa.auth.onAuthStateChange(async (event, session) => {
+  if (session) {
+    currentUser = session.user;
+    const em = currentUser.email.toLowerCase();
+    
+    if(em !== USER_A && em !== USER_B){
+       await showModal('บัญชีของพี่ไม่ได้รับอนุญาตให้เข้าห้องนี้นะคะ');
+       await supa.auth.signOut(); return;
+    }
+
+    document.getElementById('loginPage').classList.add('hidden');
+    document.getElementById('chatPage').classList.remove('hidden', 'flex-col');
+    document.getElementById('chatPage').classList.add('flex', 'flex-col');
+    document.getElementById('meId').textContent = 'คุณ: '+em+' (แชทกับ '+otherEmailOf(em)+')';
+
+    loadMessages();
+    initCallChannel(); // 🎯 เปิดวิทยุสื่อสารสำหรับรับสายโทรเข้า-ออกค่ะ
+  } else {
+    document.getElementById('chatPage').classList.add('hidden');
+    document.getElementById('loginPage').classList.remove('hidden');
+  }
+});
+
+async function loadMessages() {
+  const { data, error } = await supa
+    .from('messages')
+    .select('*')
+    .eq('room_id', ROOM_ID)
+    .order('created_at', { ascending: false })
+    .limit(currentLimit);
+
+  if (data) {
+    list.innerHTML = '';
+    nodeMap.clear();
+    const msgs = data.reverse();
+    msgs.forEach(m => {
+      const el = renderOrUpdate(m, currentUser);
+      list.appendChild(el);
+    });
+    scrollToLatest(false);
+  }
+
+  if (channel) supa.removeChannel(channel);
+  channel = supa.channel('room-messages')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${ROOM_ID}` }, payload => {
+      const el = renderOrUpdate(payload.new, currentUser);
+      if (payload.eventType === 'INSERT') {
+        list.appendChild(el);
+        if (isAtBottom() || payload.new.uid === currentUser.id) scrollToLatest(true);
+      }
+    })
+    .subscribe();
+}
+
+/* ========== 5) แสดงผลข้อความ (Render) ========== */
+function renderOrUpdate(m, user){
+  const mine = m.uid === user.id;
+  let el = nodeMap.get(m.id);
+  
+  if(!el){
+    el = document.createElement('div');
+    el.className = `w-full flex ${mine ? 'justify-end' : 'justify-start'}`;
+    const bubbleColor = mine ? 'bg-pink-100 text-pink-900 rounded-br-sm' : 'bg-white border border-slate-100 text-slate-800 rounded-bl-sm shadow-sm';
+    
+    el.innerHTML = `
+      <div class="max-w-[85%] md:max-w-[70%] rounded-2xl px-4 py-2 flex items-end gap-2 ${bubbleColor}">
+        <div class="content text-[15px] leading-relaxed break-words min-w-0 w-full"></div>
+        <div class="flex items-center justify-end gap-1 flex-shrink-0 mb-0.5">
+            <span class="time text-[11px] opacity-60"></span>
+            <span class="read-status text-[11px] text-pink-500 font-medium hidden">อ่านแล้ว</span>
+        </div>
+      </div>`;
+    nodeMap.set(m.id, el);
+  }
+
+  const content = el.querySelector('.content');
+  const time = el.querySelector('.time');
+  const readStatus = el.querySelector('.read-status');
+
+  if (!content.innerHTML) {
+      if(m.type==='image'){
+        content.innerHTML = `<img id="img_${m.id}" src="${m.url}" class="w-full max-w-sm rounded-xl object-cover mt-1">`;
+        content.querySelector(`#img_${m.id}`)?.addEventListener('load', ()=> scrollToLatest(false), { once:true });
+      }else if(m.type==='video'){
+        content.innerHTML = `<video id="vid_${m.id}" src="${m.url}" controls playsinline class="w-full max-w-sm rounded-xl object-cover mt-1"></video>`;
+      }else{
+        content.innerHTML = autolink(m.text||'');
+      }
+  }
+  time.textContent = fmtTime(m.created_at);
+
+  const readByData = m.read_by || {};
+  if (mine && Object.keys(readByData).length > 1) { 
+    readStatus.classList.remove('hidden'); 
+  }
+
+  if (!mine && !readByData[user.id]) {
+    queueRead(m);
+  }
+
+  return el;
+}
+
+let readQueue = [], readTimer = null;
+function queueRead(m) {
+  readQueue.push(m);
+  if (readTimer) return;
+  readTimer = setTimeout(async () => {
+    if (!currentUser) return;
+    const msgsToUpdate = [...readQueue];
+    readQueue = []; readTimer = null;
+    
+    for (const msg of msgsToUpdate) {
+       await supa.from('messages').update({ 
+         read_by: { ...(msg.read_by || {}), [currentUser.id]: true } 
+       }).eq('id', msg.id);
+    }
+  }, 500);
+}
+
+/* ========== 6) ส่งข้อความ & อัปโหลดรูป ========== */
+const textEl = document.getElementById('text');
+const sendBtn = document.getElementById('sendBtn');
+const notifyChk = document.getElementById('notifyChk');
+
+async function sendText(){
+  if(!currentUser) return;
+  const txt = textEl.value.trim(); if(!txt) return; 
+  textEl.value = '';
+  
+  await supa.from('messages').insert([{
+    room_id: ROOM_ID,
+    uid: currentUser.id,
+    email: currentUser.email,
+    type: 'text',
+    text: txt,
+    read_by: { [currentUser.id]: true }
+  }]);
+
+  if(notifyChk.checked) google.script.run.sendNotifyEmail(otherEmailOf(currentUser.email));
+}
+
+sendBtn.addEventListener('click', sendText);
+textEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendText(); });
+
+document.getElementById('btnCamera').addEventListener('click', ()=> document.getElementById('fileCamera').click());
+document.getElementById('btnLibrary').addEventListener('click', ()=> document.getElementById('fileLibrary').click());
+
+async function uploadAndSend(file){
+  if(!currentUser || !file) return;
+  const btnLib = document.getElementById('btnLibrary');
+  const ogLibText = btnLib.innerHTML;
+  btnLib.innerHTML = '⏳ กำลังส่ง...';
+  btnLib.disabled = true; document.getElementById('btnCamera').disabled = true;
+
+  try {
+      const ext = file.name.split('.').pop() || 'jpg';
+      const kind = file.type.startsWith('video') ? 'video' : 'image';
+      const path = `${ROOM_ID}/${Date.now()}_${currentUser.id}.${ext}`;
+      
+      const { data, error } = await supa.storage.from('chat-media').upload(path, file);
+      if(error) throw error;
+
+      const { data: { publicUrl } } = supa.storage.from('chat-media').getPublicUrl(path);
+      
+      await supa.from('messages').insert([{
+        room_id: ROOM_ID, uid: currentUser.id, email: currentUser.email,
+        type: kind, url: publicUrl, read_by: { [currentUser.id]: true }
+      }]);
+
+      if(notifyChk.checked) google.script.run.sendNotifyEmail(otherEmailOf(currentUser.email));
+  } catch (error) {
+      showModal('อัปโหลดไฟล์ไม่สำเร็จ ลองใหม่อีกครั้งนะคะ', 'ข้อผิดพลาด');
+  } finally {
+      btnLib.innerHTML = ogLibText;
+      btnLib.disabled = false; document.getElementById('btnCamera').disabled = false;
+  }
+}
+
+document.getElementById('fileCamera').addEventListener('change', (e)=> { uploadAndSend(e.target.files[0]); e.target.value=''; });
+document.getElementById('fileLibrary').addEventListener('change', (e)=> { uploadAndSend(e.target.files[0]); e.target.value=''; });
+
+
+/* ===================== 📞 ระบบ WebRTC โทรเสียง/วิดีโอ (ฉบับสมบูรณ์) ===================== */
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+const webrtc = { pc: null, localStream: null, isVideo: false };
+let callChannel = null;
+
+const callStatusEl = document.getElementById('callStatus');
+const callStatusMsg = document.getElementById('callStatusMsg');
+
+function setCallStatus(text, colorClass='bg-blue-600'){
+  callStatusMsg.className = `px-5 py-2 rounded-full text-white text-sm font-medium shadow-lg transition-colors ${colorClass}`;
+  callStatusMsg.textContent = text;
+  callStatusEl.classList.remove('hidden');
+}
+
+// 🎯 เปิดช่องสัญญาณ Realtime Broadcast สำหรับแลกเปลี่ยนสายโทร
+function initCallChannel() {
+  if (callChannel) supa.removeChannel(callChannel);
+  
+  callChannel = supa.channel(`signaling-${ROOM_ID}`)
+    .on('broadcast', { event: 'signal' }, async ({ payload }) => {
+      if (!currentUser || payload.sender === currentUser.email) return; // ข้ามข้อความของตัวเอง
+      
+      if (payload.type === 'offer') {
+        handleIncomingCall(payload);
+      } else if (payload.type === 'answer') {
+        if (webrtc.pc && webrtc.pc.signalingState !== 'stable') {
+          await webrtc.pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+          setCallStatus('เชื่อมต่อสายแล้วค่ะ พูดคุยได้เลยค๊าา 🎉', 'bg-emerald-500');
+        }
+      } else if (payload.type === 'candidate') {
+        if (webrtc.pc) {
+          try { await webrtc.pc.addIceCandidate(new RTCIceCandidate(payload.candidate)); } catch(e){}
+        }
+      } else if (payload.type === 'hangup') {
+        handleRemoteHangup(payload.reason);
+      }
+    })
+    .subscribe();
+}
+
+// 🎯 ฟังก์ชันเริ่มโทรออก (ทั้งโทรเสียงและวิดีโอ)
+async function startCall(isVideo) {
+  if (!currentUser) return showModal('กรุณาล็อกอินก่อนนะคะพี่ชาย');
+  
+  webrtc.isVideo = isVideo;
+  setCallStatus(isVideo ? 'กำลังเรียกสายวิดีโอ...' : 'กำลังเรียกสายเสียง...', 'bg-blue-600');
+  
+  document.getElementById('btnHangup').classList.remove('hidden');
+  document.getElementById('btnVoiceCall').disabled = true;
+  document.getElementById('btnVideoCall').disabled = true;
+  
+  if (isVideo) document.getElementById('videoBox').classList.remove('hidden');
+
+  try {
+    // ดึงเฉพาะเสียง หรือทั้งภาพและเสียงตามที่พี่กดเลือก
+    webrtc.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
+    document.getElementById('localVideo').srcObject = webrtc.localStream;
+    
+    webrtc.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    
+    webrtc.localStream.getTracks().forEach(track => webrtc.pc.addTrack(track, webrtc.localStream));
+    
+    webrtc.pc.ontrack = (e) => {
+      document.getElementById('remoteVideo').srcObject = e.streams[0];
+    };
+    
+    webrtc.pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        callChannel.send({
+          type: 'broadcast', event: 'signal',
+          payload: { type: 'candidate', candidate: e.candidate, sender: currentUser.email }
+        });
+      }
+    };
+    
+    const offer = await webrtc.pc.createOffer();
+    await webrtc.pc.setLocalDescription(offer);
+    
+    // ส่งสัญญาณเรียกสายออกไปหากันผ่านระะบบ Broadcast
+    callChannel.send({
+      type: 'broadcast', event: 'signal',
+      payload: { type: 'offer', offer: offer, isVideo: isVideo, sender: currentUser.email }
+    });
+    
+  } catch (err) {
+    // 🎯 โค้ดนักสืบ: ให้มันแสดงชื่อ Error ออกมาให้เราเห็นชัดๆ ไปเลยค่ะ
+    showModal(`กล้อง/ไมค์ถูกบล็อกค่ะพี่\nสาเหตุ: ${err.name}\nรายละเอียด: ${err.message}`, 'ข้อผิดพลาด');
+    endCall(false);
+  }
+}
+
+// 🎯 ฟังก์ชันจัดการตอนสายเรียกเข้า
+async function handleIncomingCall(payload) {
+  if (webrtc.pc) {
+    // ถ้าติดสายอยู่ ให้ส่งสัญญาณบอกปลายทางว่าสายไม่ว่างอัตโนมัติค่ะ
+    callChannel.send({
+      type: 'broadcast', event: 'signal',
+      payload: { type: 'hangup', reason: 'busy', sender: currentUser.email }
+    });
+    return;
+  }
+  
+  const callTypeStr = payload.isVideo ? '📹 วิดีโอคอล' : '📞 สายโทรเสียง';
+  setCallStatus(`มี${callTypeStr} เรียกเข้า...`, 'bg-amber-500');
+  
+  const accept = await showModal(`มี${callTypeStr} จากคุณ ${payload.sender}\nพี่ต้องการรับสายไหมคะ?`, 'สายเรียกเข้า', true);
+  
+  if (!accept) {
+    callChannel.send({
+      type: 'broadcast', event: 'signal',
+      payload: { type: 'hangup', reason: 'rejected', sender: currentUser.email }
+    });
+    endCall(false);
+    return;
+  }
+  
+  webrtc.isVideo = payload.isVideo;
+  document.getElementById('btnHangup').classList.remove('hidden');
+  document.getElementById('btnVoiceCall').disabled = true;
+  document.getElementById('btnVideoCall').disabled = true;
+  if (payload.isVideo) document.getElementById('videoBox').classList.remove('hidden');
+  
+  try {
+    webrtc.localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: payload.isVideo });
+    document.getElementById('localVideo').srcObject = webrtc.localStream;
+    
+    webrtc.pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    webrtc.localStream.getTracks().forEach(track => webrtc.pc.addTrack(track, webrtc.localStream));
+    
+    webrtc.pc.ontrack = (e) => {
+      document.getElementById('remoteVideo').srcObject = e.streams[0];
+    };
+    
+    webrtc.pc.onicecandidate = (e) => {
+      if (e.candidate) {
+        callChannel.send({
+          type: 'broadcast', event: 'signal',
+          payload: { type: 'candidate', candidate: e.candidate, sender: currentUser.email }
+        });
+      }
+    };
+    
+    await webrtc.pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+    const answer = await webrtc.pc.createAnswer();
+    await webrtc.pc.setLocalDescription(answer);
+    
+    callChannel.send({
+      type: 'broadcast', event: 'signal',
+      payload: { type: 'answer', answer: answer, sender: currentUser.email }
+    });
+    
+    setCallStatus('เชื่อมต่อสายแล้วค่ะ พูดคุยได้เลยค๊าา 🎉', 'bg-emerald-500');
+    
+  } catch (err) {
+    // 🎯 โค้ดนักสืบ: ให้มันแสดงชื่อ Error ออกมาให้เราเห็นชัดๆ ไปเลยค่ะ
+    showModal(`กล้อง/ไมค์ถูกบล็อกค่ะพี่\nสาเหตุ: ${err.name}\nรายละเอียด: ${err.message}`, 'ข้อผิดพลาด');
+    endCall(false);
+  }
+}
+
+function handleRemoteHangup(reason) {
+  if (reason === 'rejected') {
+    showModal('ปลายทางปฏิเสธสายกดวางไปแล้วค่ะพี่', 'สายหลุด');
+  } else if (reason === 'busy') {
+    showModal('ปลายทางติดสายอื่นอยู่ค่ะพี่ชายไว้ค่อยลองใหม่นะคะ', 'สายไม่ว่าง');
+  } else {
+    setCallStatus('วางสายแล้วค่ะ', 'bg-rose-500');
+    setTimeout(() => callStatusEl.classList.add('hidden'), 2000);
+  }
+  endCall(false); 
+}
+
+// 🎯 ฟังก์ชันการวางสาย
+async function endCall(sendSignal = true) {
+  if (sendSignal && callChannel && currentUser) {
+    callChannel.send({
+      type: 'broadcast', event: 'signal',
+      payload: { type: 'hangup', sender: currentUser.email }
+    });
+  }
+  
+  try { webrtc.localStream?.getTracks().forEach(t => t.stop()); } catch(e){}
+  try { webrtc.pc?.close(); } catch(e){}
+  
+  webrtc.pc = null;
+  webrtc.localStream = null;
+  
+  document.getElementById('videoBox').classList.add('hidden');
+  document.getElementById('btnHangup').classList.add('hidden');
+  document.getElementById('btnVoiceCall').disabled = false;
+  document.getElementById('btnVideoCall').disabled = false;
+  
+  if (sendSignal) callStatusEl.classList.add('hidden');
+}
+
+// ผูกปุ่มกดเข้ากับระบบ
+document.getElementById('btnVoiceCall').addEventListener('click', ()=> startCall(false)); // โทรเสียงอย่างเดียว (ปิดกล้อง)
+document.getElementById('btnVideoCall').addEventListener('click', ()=> startCall(true));  // โทรวิดีโอคอล (เปิดกล้อง)
+document.getElementById('btnHangup').addEventListener('click', ()=> endCall(true));
+
+document.getElementById('btnMute').addEventListener('click', ()=>{
+  const s = webrtc.localStream; if (!s) return;
+  const audio = s.getAudioTracks()[0]; if (!audio) return;
+  audio.enabled = !audio.enabled;
+  document.getElementById('btnMute').textContent = audio.enabled ? 'ไมค์ เปิด' : 'ไมค์ ปิด';
+});
+document.getElementById('btnCam').addEventListener('click', ()=>{
+  const s = webrtc.localStream; if (!s) return;
+  const video = s.getVideoTracks()[0]; if (!video) return;
+  video.enabled = !video.enabled;
+  document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
+});
+</script>
+</body>
+</html>
