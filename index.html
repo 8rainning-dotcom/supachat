@@ -423,7 +423,7 @@ function initCallChannel() {
       } else if (payload.type === 'answer') {
         if (webrtc.pc && webrtc.pc.signalingState !== 'stable') {
           await webrtc.pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
-          setCallStatus('เชื่อมต่อสายแล้วค่ะ พูดคุยได้เลยค๊าา 🎉', 'bg-emerald-500');
+          setCallStatus('เชื่อมต่อสายแล้ว', 'bg-emerald-500');
         }
       } else if (payload.type === 'candidate') {
         if (webrtc.pc) {
@@ -501,7 +501,7 @@ async function handleIncomingCall(payload) {
   const callTypeStr = payload.isVideo ? '📹 วิดีโอคอล' : '📞 สายโทรเสียง';
   setCallStatus(`มี${callTypeStr} เรียกเข้า...`, 'bg-amber-500');
   
-  const accept = await showModal(`มี${callTypeStr} จากคุณ ${payload.sender}\nพี่ต้องการรับสายไหมคะ?`, 'สายเรียกเข้า', true);
+  const accept = await showModal(`มี${callTypeStr} จากคุณ ${payload.sender}\nต้องการรับสายไหม?`, 'สายเรียกเข้า', true);
   
   if (!accept) {
     callChannel.send({
@@ -547,7 +547,7 @@ async function handleIncomingCall(payload) {
       payload: { type: 'answer', answer: answer, sender: currentUser.email }
     });
     
-    setCallStatus('เชื่อมต่อสายแล้วค่ะ พูดคุยได้เลยค๊าา 🎉', 'bg-emerald-500');
+    setCallStatus('เชื่อมต่อสายแล้ว', 'bg-emerald-500');
     
   } catch (err) {
     // 🎯 โค้ดนักสืบ: ให้มันแสดงชื่อ Error ออกมาให้เราเห็นชัดๆ ไปเลยค่ะ
@@ -558,11 +558,11 @@ async function handleIncomingCall(payload) {
 
 function handleRemoteHangup(reason) {
   if (reason === 'rejected') {
-    showModal('ปลายทางปฏิเสธสายกดวางไปแล้วค่ะพี่', 'สายหลุด');
+    showModal('ปลายทางปฏิเสธสาย', 'สายหลุด');
   } else if (reason === 'busy') {
-    showModal('ปลายทางติดสายอื่นอยู่ค่ะพี่ชายไว้ค่อยลองใหม่นะคะ', 'สายไม่ว่าง');
+    showModal('ปลายทางติดสายอื่นอยู่', 'สายไม่ว่าง');
   } else {
-    setCallStatus('วางสายแล้วค่ะ', 'bg-rose-500');
+    setCallStatus('วางสายแล้ว', 'bg-rose-500');
     setTimeout(() => callStatusEl.classList.add('hidden'), 2000);
   }
   endCall(false); 
