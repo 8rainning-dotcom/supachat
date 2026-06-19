@@ -636,39 +636,62 @@ document.getElementById('btnCam').addEventListener('click', ()=>{
   document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
 });
 
-/* ===================== ⏱️ ระบบล็อกเอาท์อัตโนมัติเมื่อไม่ใช้งาน 8 นาที (แบบเงียบ) ===================== */
+/* ===================== ⏱️ ระบบล็อกเอาท์อัตโนมัติเมื่อไม่ใช้งาน 8 นาที (ฉบับแก้ไขตอนปิดแอป/พับจอ) ===================== */
 let idleTimer = null;
-const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // กำหนดเวลา 8 นาที (หน่วยเป็นมิลลิวินาที)
+let lastActivityTime = Date.now(); // จำเวลาที่มีการเคลื่อนไหวล่าสุดไว้ค่ะ
+const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // กำหนดเวลา 8 นาที
 
 // ฟังก์ชันสำหรับล็อกเอาท์เมื่อหมดเวลา
 async function autoLogout() {
   if (currentUser) {
+    clearTimeout(idleTimer);
     await supa.auth.signOut(); // สั่งล็อกเอาท์ออกจาก Supabase
-    window.location.reload(); // โหลดหน้าเว็บใหม่กลับไปหน้าล็อกอินทันทีโดยไม่แจ้งเตือน
+    window.location.reload(); // โหลดหน้าเว็บใหม่กลับไปหน้าล็อกอินทันที
   }
 }
 
 // ฟังก์ชันสำหรับเริ่มนับเวลาใหม่
 function resetIdleTimer() {
-  clearTimeout(idleTimer); // ล้างเวลาเก่าทิ้ง
+  lastActivityTime = Date.now(); // อัปเดตเวลาล่าสุดเป็นปัจจุบันทุกครั้งที่มีการขยับ
+  clearTimeout(idleTimer); 
   if (currentUser) {
-    idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS); // เริ่มนับ 8 นาทีใหม่
+    idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS); // นับเวลาถอยหลัง (สำหรับตอนเปิดจอค้างไว้)
   }
 }
 
-// ดักจับการเคลื่อนไหวเพื่อรีเซ็ตเวลา
+// ฟังก์ชันพิเศษ: เช็คเวลาทันทีที่พี่เปิดแอปกลับเข้ามาใหม่
+function checkIdleOnResume() {
+  if (currentUser) {
+    const timePassed = Date.now() - lastActivityTime;
+    if (timePassed >= IDLE_TIMEOUT_MS) {
+      autoLogout(); // ถ้าปิดแอปไปนานเกิน 8 นาทีแล้ว ยินดีต้อนรับสู่หน้าล็อกอินค่ะเตะออกทันที!
+    } else {
+      resetIdleTimer(); // ถ้ายังไม่เกิน ก็นับเวลาต่อจากที่เหลือค่ะ
+    }
+  }
+}
+
+// ดักจับการเคลื่อนไหวเพื่อรีเซ็ตเวลาตอนใช้งานปกติ
 window.addEventListener('mousemove', resetIdleTimer);
 window.addEventListener('keydown', resetIdleTimer);
 window.addEventListener('click', resetIdleTimer);
 window.addEventListener('touchstart', resetIdleTimer);
 window.addEventListener('scroll', resetIdleTimer, true);
 
+// 🎯 ส่วนสำคัญ: ดักจับตอนพี่เปิดจอมือถือกลับมา หรือสลับหน้าต่างกลับมาที่แอปแชทค่ะ
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    checkIdleOnResume();
+  }
+});
+window.addEventListener('focus', checkIdleOnResume);
+
 // ให้เริ่มทำงานอัตโนมัติตอนที่ล็อกอินเข้ามาสำเร็จ
 supa.auth.onAuthStateChange((event, session) => {
   if (session) {
-    resetIdleTimer(); // เริ่มนับเวลาตอนเข้าสู่ระบบ
+    resetIdleTimer();
   } else {
-    clearTimeout(idleTimer); // หยุดนับเวลาถ้าล็อกเอาท์ออกไปแล้ว
+    clearTimeout(idleTimer);
   }
 });
 </script>
