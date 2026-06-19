@@ -635,6 +635,42 @@ document.getElementById('btnCam').addEventListener('click', ()=>{
   video.enabled = !video.enabled;
   document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
 });
+
+/* ===================== ⏱️ ระบบล็อกเอาท์อัตโนมัติเมื่อไม่ใช้งาน 8 นาที (แบบเงียบ) ===================== */
+let idleTimer = null;
+const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // กำหนดเวลา 8 นาที (หน่วยเป็นมิลลิวินาที)
+
+// ฟังก์ชันสำหรับล็อกเอาท์เมื่อหมดเวลา
+async function autoLogout() {
+  if (currentUser) {
+    await supa.auth.signOut(); // สั่งล็อกเอาท์ออกจาก Supabase
+    window.location.reload(); // โหลดหน้าเว็บใหม่กลับไปหน้าล็อกอินทันทีโดยไม่แจ้งเตือน
+  }
+}
+
+// ฟังก์ชันสำหรับเริ่มนับเวลาใหม่
+function resetIdleTimer() {
+  clearTimeout(idleTimer); // ล้างเวลาเก่าทิ้ง
+  if (currentUser) {
+    idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS); // เริ่มนับ 8 นาทีใหม่
+  }
+}
+
+// ดักจับการเคลื่อนไหวเพื่อรีเซ็ตเวลา
+window.addEventListener('mousemove', resetIdleTimer);
+window.addEventListener('keydown', resetIdleTimer);
+window.addEventListener('click', resetIdleTimer);
+window.addEventListener('touchstart', resetIdleTimer);
+window.addEventListener('scroll', resetIdleTimer, true);
+
+// ให้เริ่มทำงานอัตโนมัติตอนที่ล็อกอินเข้ามาสำเร็จ
+supa.auth.onAuthStateChange((event, session) => {
+  if (session) {
+    resetIdleTimer(); // เริ่มนับเวลาตอนเข้าสู่ระบบ
+  } else {
+    clearTimeout(idleTimer); // หยุดนับเวลาถ้าล็อกเอาท์ออกไปแล้ว
+  }
+});
 </script>
 </body>
 </html>
