@@ -636,39 +636,21 @@ document.getElementById('btnCam').addEventListener('click', ()=>{
   document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
 });
 
-/* ========== ⏱️ ระบบล็อกเอาท์อัตโนมัติ 8 นาที (ฉบับผสมผสานความเรียบง่าย + กันมือถือหลับ) ========== */
-const IDLE_MS = 8 * 60 * 1000;
-let idleTimer = null;
-let lastActivityTime = Date.now();
+/* ========== 5) Idle logout 8 นาที ========== */
+const IDLE_MS = 8*60*1000;
+let idleTimer=null;
+let forcedByIdle=false;
 
-async function idleLogout() {
-  if (!currentUser) return;
-  try { 
-    await supa.auth.signOut(); 
-    // ใช้ระบบของแอปเก่าพี่เลยค่ะ ไม่ต้อง reload หน้าเว็บ ให้ onAuthStateChange จัดการซ่อนแชทให้เอง
-  } catch(e) { 
-    setTimeout(() => supa.auth.signOut().catch(()=>{}), 1000); 
-  }
+async function idleLogout(){
+  try { forcedByIdle = true; await auth.signOut(); } 
+  catch(e) { setTimeout(()=>auth.signOut().catch(()=>{}), 1000); }
 }
-
-function checkAndResetIdle() {
-  if (!currentUser) return;
-  
-  // 1. ถ้าพับจอไปนานเกิน 8 นาที แล้วเพิ่งเปิดแอปกลับมา หรือเพิ่งแตะจอ ให้เตะออกทันที!
-  if (Date.now() - lastActivityTime >= IDLE_MS) {
-    idleLogout();
-    return;
-  }
-  
-  // 2. ถ้ายังไม่เกิน 8 นาที ให้จดเวลาปัจจุบันไว้ แล้วตั้งนาฬิกาปลุกใหม่
-  lastActivityTime = Date.now();
+function resetIdle(){
   clearTimeout(idleTimer);
   idleTimer = setTimeout(idleLogout, IDLE_MS);
 }
-
-// ผูกระบบดักจับการขยับทุกรูปแบบเหมือนที่พี่เคยทำเลยค่ะ
-['click', 'keydown', 'scroll', 'touchstart', 'visibilitychange'].forEach(ev => {
-  document.addEventListener(ev, checkAndResetIdle, { passive: true });
+['click','keydown','scroll','touchstart','visibilitychange'].forEach(ev=>{
+  document.addEventListener(ev, resetIdle, {passive:true});
 });
 </script>
 </body>
