@@ -636,60 +636,75 @@ document.getElementById('btnCam').addEventListener('click', ()=>{
   document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
 });
 
-/* ===================== ⏱️ ระบบล็อกเอาท์อัตโนมัติเมื่อไม่ใช้งาน 8 นาที (ฉบับแก้ไขตอนปิดแอป/พับจอ) ===================== */
+/* ===================== ⏱️ ระบบล็อกเอาท์อัตโนมัติเมื่อไม่ใช้งาน 8 นาที (ฉบับสมบูรณ์ แก้บั๊กมือถือ) ===================== */
 let idleTimer = null;
-let lastActivityTime = Date.now(); // จำเวลาที่มีการเคลื่อนไหวล่าสุดไว้ค่ะ
-const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // กำหนดเวลา 8 นาที
+let lastActivityTime = Date.now(); 
+const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // 8 นาที
 
-// ฟังก์ชันสำหรับล็อกเอาท์เมื่อหมดเวลา
+// 🎯 1. ฟังก์ชันเตะออกแบบเด็ดขาด
 async function autoLogout() {
   if (currentUser) {
     clearTimeout(idleTimer);
-    await supa.auth.signOut(); // สั่งล็อกเอาท์ออกจาก Supabase
-    window.location.reload(); // โหลดหน้าเว็บใหม่กลับไปหน้าล็อกอินทันที
-  }
-}
-
-// ฟังก์ชันสำหรับเริ่มนับเวลาใหม่
-function resetIdleTimer() {
-  lastActivityTime = Date.now(); // อัปเดตเวลาล่าสุดเป็นปัจจุบันทุกครั้งที่มีการขยับ
-  clearTimeout(idleTimer); 
-  if (currentUser) {
-    idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS); // นับเวลาถอยหลัง (สำหรับตอนเปิดจอค้างไว้)
-  }
-}
-
-// ฟังก์ชันพิเศษ: เช็คเวลาทันทีที่พี่เปิดแอปกลับเข้ามาใหม่
-function checkIdleOnResume() {
-  if (currentUser) {
-    const timePassed = Date.now() - lastActivityTime;
-    if (timePassed >= IDLE_TIMEOUT_MS) {
-      autoLogout(); // ถ้าปิดแอปไปนานเกิน 8 นาทีแล้ว ยินดีต้อนรับสู่หน้าล็อกอินค่ะเตะออกทันที!
-    } else {
-      resetIdleTimer(); // ถ้ายังไม่เกิน ก็นับเวลาต่อจากที่เหลือค่ะ
+    currentUser = null; // ป้องกันไม่ให้โค้ดทำงานซ้ำซ้อน
+    
+    try {
+      await supa.auth.signOut(); // 1. บอก Supabase ให้ Logout
+    } catch (err) {
+      console.log('Signout error:', err);
     }
+    
+    // 2. ล้างข้อมูลค้างในเครื่องทิ้งทั้งหมด! แก้ปัญหาเด้งล็อกอินกลับเข้ามาเอง
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // 3. หน่วงเวลาไว้เสี้ยววินาทีให้ชัวร์ว่าลบเกลี้ยงแล้ว ค่อยโหลดหน้าใหม่
+    setTimeout(() => {
+      window.location.reload(); 
+    }, 300);
   }
 }
 
-// ดักจับการเคลื่อนไหวเพื่อรีเซ็ตเวลาตอนใช้งานปกติ
-window.addEventListener('mousemove', resetIdleTimer);
-window.addEventListener('keydown', resetIdleTimer);
-window.addEventListener('click', resetIdleTimer);
-window.addEventListener('touchstart', resetIdleTimer);
-window.addEventListener('scroll', resetIdleTimer, true);
+// 🎯 2. ฟังก์ชันตรวจสอบการเคลื่อนไหวแบบฉลาด
+function handleActivity() {
+  if (!currentUser) return;
+  
+  const now = Date.now();
+  const timePassed = now - lastActivityTime;
+  
+  // 🔥 ทริคสำคัญ: ตรวจสอบเวลาก่อนเลย! ถ้าแอปโดนพับไปเกิน 8 นาที แล้วพี่เพิ่งมาแตะจอ
+  // ระบบจะรู้ทันทีว่า "เวลาเกินแล้ว" และเตะออกทันทีโดยไม่ไปรีเซ็ตเวลาใหม่ค่ะ
+  if (timePassed >= IDLE_TIMEOUT_MS) {
+    autoLogout();
+    return;
+  }
+  
+  // ถ้ายอดเวลายังไม่เกิน 8 นาที ค่อยจดเวลาปัจจุบันลงไปใหม่
+  lastActivityTime = now;
+  clearTimeout(idleTimer); 
+  idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS);
+}
 
-// 🎯 ส่วนสำคัญ: ดักจับตอนพี่เปิดจอมือถือกลับมา หรือสลับหน้าต่างกลับมาที่แอปแชทค่ะ
+// ผูกระบบเข้ากับการขยับทุกรูปแบบ (แตะ, เลื่อน, พิมพ์)
+window.addEventListener('mousemove', handleActivity);
+window.addEventListener('keydown', handleActivity);
+window.addEventListener('click', handleActivity);
+window.addEventListener('touchstart', handleActivity, { passive: true });
+window.addEventListener('scroll', handleActivity, true);
+
+// ผูกระบบเข้ากับการสลับหน้าจอ / เปิดจอมือถือกลับมา
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') {
-    checkIdleOnResume();
+    handleActivity();
   }
 });
-window.addEventListener('focus', checkIdleOnResume);
+window.addEventListener('focus', handleActivity);
 
-// ให้เริ่มทำงานอัตโนมัติตอนที่ล็อกอินเข้ามาสำเร็จ
+// เริ่มจับเวลาทันทีที่ล็อกอินเข้าห้องแชทสำเร็จ
 supa.auth.onAuthStateChange((event, session) => {
   if (session) {
-    resetIdleTimer();
+    lastActivityTime = Date.now();
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS);
   } else {
     clearTimeout(idleTimer);
   }
