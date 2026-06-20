@@ -636,78 +636,39 @@ document.getElementById('btnCam').addEventListener('click', ()=>{
   document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
 });
 
-/* ===================== ⏱️ ระบบล็อกเอาท์อัตโนมัติเมื่อไม่ใช้งาน 8 นาที (ฉบับสมบูรณ์ แก้บั๊กมือถือ) ===================== */
+/* ========== ⏱️ ระบบล็อกเอาท์อัตโนมัติ 8 นาที (ฉบับผสมผสานความเรียบง่าย + กันมือถือหลับ) ========== */
+const IDLE_MS = 8 * 60 * 1000;
 let idleTimer = null;
-let lastActivityTime = Date.now(); 
-const IDLE_TIMEOUT_MS = 8 * 60 * 1000; // 8 นาที
+let lastActivityTime = Date.now();
 
-// 🎯 1. ฟังก์ชันเตะออกแบบเด็ดขาด
-async function autoLogout() {
-  if (currentUser) {
-    clearTimeout(idleTimer);
-    currentUser = null; // ป้องกันไม่ให้โค้ดทำงานซ้ำซ้อน
-    
-    try {
-      await supa.auth.signOut(); // 1. บอก Supabase ให้ Logout
-    } catch (err) {
-      console.log('Signout error:', err);
-    }
-    
-    // 2. ล้างข้อมูลค้างในเครื่องทิ้งทั้งหมด! แก้ปัญหาเด้งล็อกอินกลับเข้ามาเอง
-    localStorage.clear();
-    sessionStorage.clear();
-    
-    // 3. หน่วงเวลาไว้เสี้ยววินาทีให้ชัวร์ว่าลบเกลี้ยงแล้ว ค่อยโหลดหน้าใหม่
-    setTimeout(() => {
-      window.location.reload(); 
-    }, 300);
+async function idleLogout() {
+  if (!currentUser) return;
+  try { 
+    await supa.auth.signOut(); 
+    // ใช้ระบบของแอปเก่าพี่เลยค่ะ ไม่ต้อง reload หน้าเว็บ ให้ onAuthStateChange จัดการซ่อนแชทให้เอง
+  } catch(e) { 
+    setTimeout(() => supa.auth.signOut().catch(()=>{}), 1000); 
   }
 }
 
-// 🎯 2. ฟังก์ชันตรวจสอบการเคลื่อนไหวแบบฉลาด
-function handleActivity() {
+function checkAndResetIdle() {
   if (!currentUser) return;
   
-  const now = Date.now();
-  const timePassed = now - lastActivityTime;
-  
-  // 🔥 ทริคสำคัญ: ตรวจสอบเวลาก่อนเลย! ถ้าแอปโดนพับไปเกิน 8 นาที แล้วพี่เพิ่งมาแตะจอ
-  // ระบบจะรู้ทันทีว่า "เวลาเกินแล้ว" และเตะออกทันทีโดยไม่ไปรีเซ็ตเวลาใหม่ค่ะ
-  if (timePassed >= IDLE_TIMEOUT_MS) {
-    autoLogout();
+  // 1. ถ้าพับจอไปนานเกิน 8 นาที แล้วเพิ่งเปิดแอปกลับมา หรือเพิ่งแตะจอ ให้เตะออกทันที!
+  if (Date.now() - lastActivityTime >= IDLE_MS) {
+    idleLogout();
     return;
   }
   
-  // ถ้ายอดเวลายังไม่เกิน 8 นาที ค่อยจดเวลาปัจจุบันลงไปใหม่
-  lastActivityTime = now;
-  clearTimeout(idleTimer); 
-  idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS);
+  // 2. ถ้ายังไม่เกิน 8 นาที ให้จดเวลาปัจจุบันไว้ แล้วตั้งนาฬิกาปลุกใหม่
+  lastActivityTime = Date.now();
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(idleLogout, IDLE_MS);
 }
 
-// ผูกระบบเข้ากับการขยับทุกรูปแบบ (แตะ, เลื่อน, พิมพ์)
-window.addEventListener('mousemove', handleActivity);
-window.addEventListener('keydown', handleActivity);
-window.addEventListener('click', handleActivity);
-window.addEventListener('touchstart', handleActivity, { passive: true });
-window.addEventListener('scroll', handleActivity, true);
-
-// ผูกระบบเข้ากับการสลับหน้าจอ / เปิดจอมือถือกลับมา
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    handleActivity();
-  }
-});
-window.addEventListener('focus', handleActivity);
-
-// เริ่มจับเวลาทันทีที่ล็อกอินเข้าห้องแชทสำเร็จ
-supa.auth.onAuthStateChange((event, session) => {
-  if (session) {
-    lastActivityTime = Date.now();
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(autoLogout, IDLE_TIMEOUT_MS);
-  } else {
-    clearTimeout(idleTimer);
-  }
+// ผูกระบบดักจับการขยับทุกรูปแบบเหมือนที่พี่เคยทำเลยค่ะ
+['click', 'keydown', 'scroll', 'touchstart', 'visibilitychange'].forEach(ev => {
+  document.addEventListener(ev, checkAndResetIdle, { passive: true });
 });
 </script>
 </body>
