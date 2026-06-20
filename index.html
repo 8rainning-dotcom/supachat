@@ -257,6 +257,9 @@ supa.auth.onAuthStateChange(async (event, session) => {
 
     loadMessages();
     initCallChannel(); // 🎯 เปิดวิทยุสื่อสารสำหรับรับสายโทรเข้า-ออกค่ะ
+    
+    // 🎯 เพิ่มบรรทัดนี้ลงไป เพื่อสั่งให้นาฬิกา 8 นาทีเริ่มทำงานทันทีค่ะ
+    checkAndResetIdle();
   } else {
     document.getElementById('chatPage').classList.add('hidden');
     document.getElementById('loginPage').classList.remove('hidden');
@@ -636,42 +639,48 @@ document.getElementById('btnCam').addEventListener('click', ()=>{
   document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
 });
 
-/* ========== ⏱️ ระบบล็อกเอาท์อัตโนมัติ 8 นาที (ฉบับเด็ดขาด ไม่รออินเทอร์เน็ต) ========== */
-const IDLE_MS = 8 * 60 * 1000;
+/* ========== ⏱️ ระบบล็อกเอาท์ 8 นาที (ฉบับฝังความจำ กันมือถือแอบปิดแอป) ========== */
+const IDLE_MS = 8 * 60 * 1000; // 8 นาที
 let idleTimer = null;
-let lastActivityTime = Date.now();
+
+// 1. ดึงเวลาล่าสุดจากสมุดโน้ตในเครื่อง (ถ้าไม่มีสมุดโน้ต ให้ใช้เวลาปัจจุบัน)
+const savedTime = localStorage.getItem('supaLastActive');
+let lastActivityTime = savedTime ? parseInt(savedTime) : Date.now();
+
+// 2. ดักหน้าประตู! ถ้าเปิดแอปมาใหม่แล้วพบว่าหายไปเกิน 8 นาที ให้ล้างความจำรอเลย
+if (Date.now() - lastActivityTime >= IDLE_MS) {
+  localStorage.clear();
+  sessionStorage.clear();
+}
 
 function idleLogout() {
   if (!currentUser) return;
-  
-  // 1. สั่ง Logout เบื้องหลัง (เอาคำว่า await ออก เพื่อไม่ให้แอปค้างรออินเทอร์เน็ต)
-  supa.auth.signOut().catch(() => {}); 
-  
-  // 2. ไม้ตาย: ล้างข้อมูลการเข้าสู่ระบบในเครื่องทิ้งทั้งหมดทันที!
+  supa.auth.signOut().catch(() => {});
   localStorage.clear();
   sessionStorage.clear();
-  
-  // 3. บังคับรีเฟรชหน้าเว็บกลับไปหน้า Login (ต้องกรอกรหัสใหม่แน่นอน)
-  window.location.reload(); 
+  window.location.reload();
 }
 
 function checkAndResetIdle() {
-  if (!currentUser) return;
+  const now = Date.now();
   
-  // ตรวจสอบว่าพับจอไปเกิน 8 นาทีหรือยัง
-  if (Date.now() - lastActivityTime >= IDLE_MS) {
-    lastActivityTime = Date.now(); // จดเวลาไว้กันมันรันซ้ำตอนกำลังโหลดหน้า
+  // ถ้าเกิน 8 นาทีแล้ว เตะออกทันที
+  if (now - lastActivityTime >= IDLE_MS) {
     idleLogout();
     return;
   }
   
-  // ถ้ายังไม่เกิน ให้จดเวลาปัจจุบันไว้ แล้วตั้งเวลาปลุกใหม่
-  lastActivityTime = Date.now();
+  // ถ้ายังไม่เกิน ให้จดเวลาล่าสุดใส่ตัวแปร และฝังลงในสมุดโน้ตของเครื่องด้วย!
+  lastActivityTime = now;
+  localStorage.setItem('supaLastActive', now.toString());
+  
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(idleLogout, IDLE_MS);
+  if (currentUser) {
+    idleTimer = setTimeout(idleLogout, IDLE_MS);
+  }
 }
 
-// ผูกระบบดักจับการขยับ
+// ผูกระบบดักจับการขยับทุกช่องทาง
 ['click', 'keydown', 'scroll', 'touchstart', 'visibilitychange'].forEach(ev => {
   document.addEventListener(ev, checkAndResetIdle, { passive: true });
 });
