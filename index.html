@@ -636,21 +636,44 @@ document.getElementById('btnCam').addEventListener('click', ()=>{
   document.getElementById('btnCam').textContent = video.enabled ? 'กล้อง ปิด' : 'กล้อง เปิด';
 });
 
-/* ========== 5) Idle logout 8 นาที ========== */
-const IDLE_MS = 8*60*1000;
-let idleTimer=null;
-let forcedByIdle=false;
+/* ========== ⏱️ ระบบล็อกเอาท์อัตโนมัติ 8 นาที (ฉบับเด็ดขาด ไม่รออินเทอร์เน็ต) ========== */
+const IDLE_MS = 8 * 60 * 1000;
+let idleTimer = null;
+let lastActivityTime = Date.now();
 
-async function idleLogout(){
-  try { forcedByIdle = true; await auth.signOut(); } 
-  catch(e) { setTimeout(()=>auth.signOut().catch(()=>{}), 1000); }
+function idleLogout() {
+  if (!currentUser) return;
+  
+  // 1. สั่ง Logout เบื้องหลัง (เอาคำว่า await ออก เพื่อไม่ให้แอปค้างรออินเทอร์เน็ต)
+  supa.auth.signOut().catch(() => {}); 
+  
+  // 2. ไม้ตาย: ล้างข้อมูลการเข้าสู่ระบบในเครื่องทิ้งทั้งหมดทันที!
+  localStorage.clear();
+  sessionStorage.clear();
+  
+  // 3. บังคับรีเฟรชหน้าเว็บกลับไปหน้า Login (ต้องกรอกรหัสใหม่แน่นอน)
+  window.location.reload(); 
 }
-function resetIdle(){
+
+function checkAndResetIdle() {
+  if (!currentUser) return;
+  
+  // ตรวจสอบว่าพับจอไปเกิน 8 นาทีหรือยัง
+  if (Date.now() - lastActivityTime >= IDLE_MS) {
+    lastActivityTime = Date.now(); // จดเวลาไว้กันมันรันซ้ำตอนกำลังโหลดหน้า
+    idleLogout();
+    return;
+  }
+  
+  // ถ้ายังไม่เกิน ให้จดเวลาปัจจุบันไว้ แล้วตั้งเวลาปลุกใหม่
+  lastActivityTime = Date.now();
   clearTimeout(idleTimer);
   idleTimer = setTimeout(idleLogout, IDLE_MS);
 }
-['click','keydown','scroll','touchstart','visibilitychange'].forEach(ev=>{
-  document.addEventListener(ev, resetIdle, {passive:true});
+
+// ผูกระบบดักจับการขยับ
+['click', 'keydown', 'scroll', 'touchstart', 'visibilitychange'].forEach(ev => {
+  document.addEventListener(ev, checkAndResetIdle, { passive: true });
 });
 </script>
 </body>
