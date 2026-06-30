@@ -290,8 +290,9 @@ async function loadMessages() {
     .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `room_id=eq.${ROOM_ID}` }, payload => {
       const el = renderOrUpdate(payload.new, currentUser);
       if (payload.eventType === 'INSERT') {
-        list.appendChild(el);
-        if (isAtBottom() || payload.new.uid === currentUser.id) scrollToLatest(true);
+        const wasAtBottom = isAtBottom(); // ✨ 1. ให้ระบบจำไว้ก่อนว่าตอนนี้จอเราอยู่ล่างสุดไหม
+        list.appendChild(el); // 2. ค่อยเอาข้อความใหม่แปะลงไป
+        if (wasAtBottom || payload.new.uid === currentUser.id) scrollToLatest(true); // ✨ 3. ถ้าจออยู่ล่างสุดอยู่แล้ว ก็ให้เลื่อนลงมาอัตโนมัติเลย
       }
     })
     .subscribe();
