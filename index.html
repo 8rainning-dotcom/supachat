@@ -298,6 +298,52 @@ async function loadMessages() {
     .subscribe();
 }
 
+/* ========== ดึงข้อความเก่าเมื่อเลื่อนจอขึ้นบนสุด ========== */
+let isLoadingOlder = false; // ตัวแปรเช็คว่ากำลังโหลดอยู่ไหม จะได้ไม่โหลดซ้ำซ้อน
+let isAllLoaded = false;    // ตัวแปรเช็คว่าข้อความเก่าหมดหรือยัง
+
+document.getElementById('list').addEventListener('scroll', async function() {
+  // ถ้าพี่เลื่อนจอขึ้นไปจนสุด (scrollTop เป็น 0)
+  if (this.scrollTop === 0 && !isLoadingOlder && !isAllLoaded) {
+    isLoadingOlder = true;
+
+    // 🌟 จำความสูงของหน้าจอก่อนโหลดข้อความเก่าเอาไว้
+    const previousHeight = this.scrollHeight;
+
+    // เพิ่มจำนวนข้อความที่จะดึงมาอีกทีละ 20 ข้อความ (พี่ปรับตัวเลขได้นะคะ)
+    currentLimit += 20;
+
+    // ไปดึงข้อความจากฐานข้อมูลมาใหม่ตามจำนวนลิมิตที่เพิ่มขึ้น
+    const { data, error } = await supa
+      .from('messages')
+      .select('*')
+      .eq('room_id', ROOM_ID)
+      .order('created_at', { ascending: false })
+      .limit(currentLimit);
+
+    if (data) {
+      // ถ้าข้อมูลที่ดึงมาได้ น้อยกว่าลิมิตที่เราตั้งไว้ แสดงว่าข้อความหมดแล้วค่ะ
+      if (data.length < currentLimit) {
+        isAllLoaded = true;
+      }
+
+      // ล้างหน้าจอแล้วจัดเรียงกล่องข้อความใหม่
+      list.innerHTML = '';
+      nodeMap.clear();
+      const msgs = data.reverse();
+      msgs.forEach(m => {
+        const el = renderOrUpdate(m, currentUser);
+        list.appendChild(el);
+      });
+
+      // 🌟 ตั้งค่าจุดเลื่อนหน้าจอให้อยู่ที่ข้อความเดิมที่พี่อ่านค้างอยู่ หน้าจอจะได้ไม่เด้งค่ะ
+      this.scrollTop = this.scrollHeight - previousHeight;
+    }
+
+    isLoadingOlder = false;
+  }
+});
+  
 /* ========== 5) แสดงผลข้อความ (Render) ========== */
 function renderOrUpdate(m, user){
   const mine = m.uid === user.id;
