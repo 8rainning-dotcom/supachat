@@ -384,18 +384,19 @@ async function sendText(){
   }]);
 
   if(notifyChk.checked) {
-  // 🌟 อย่าลืมเอาลิงก์ Web App ที่ได้จาก Google Apps Script มาวางในเครื่องหมายคำพูดนี้นะคะ
-  const GAS_URL = "https://script.google.com/macros/s/AKfycbyjf8ZWwIfwTMOdXnOqoCmMdUEukgotAyQmdTmbOSF0RvFIKZ12ifXpV7_Mso1Agonx4w/exec"; 
-  
-  fetch(GAS_URL, {
-    method: 'POST',
-    body: JSON.stringify({ to: otherEmailOf(currentUser.email) }),
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
-  })
-  .then(res => res.json())
-  .then(data => console.log("ส่งเมล:", data))
-  .catch(err => console.error("Error:", err));
-}
+    // 🌟 เอาลิงก์ Web App ที่ได้จาก Google Apps Script มาวางในเครื่องหมายคำพูดนี้นะคะ
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbyjf8ZWwIfwTMOdXnOqoCmMdUEukgotAyQmdTmbOSF0RvFIKZ12ifXpV7_Mso1Agonx4w/exec"; 
+    
+    fetch(GAS_URL, {
+      method: 'POST',
+      body: JSON.stringify({ to: otherEmailOf(currentUser.email) }),
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
+    })
+    .then(res => res.json())
+    .then(data => console.log("ส่งเมล:", data))
+    .catch(err => console.error("Error:", err));
+  }
+} // 🎯 วงเล็บปีกกาตัวนี้เลยค่ะที่หายไป! ไนท์เติมให้แล้วน้า
 
 sendBtn.addEventListener('click', sendText);
 textEl.addEventListener('keydown', (e)=>{ if(e.key==='Enter') sendText(); });
