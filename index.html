@@ -726,6 +726,7 @@ let lastActivityTime = savedTime ? parseInt(savedTime) : Date.now();
 if (Date.now() - lastActivityTime >= IDLE_MS) {
   localStorage.clear();
   sessionStorage.clear();
+  lastActivityTime = Date.now(); // ✨ เพิ่มบรรทัดนี้ เพื่อรีเซ็ตนาฬิกากลับมาเริ่มต้นใหม่ค่ะ!
 }
 
 function idleLogout() {
