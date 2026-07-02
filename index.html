@@ -372,7 +372,11 @@ function renderOrUpdate(m, user){
   if (!content.innerHTML) {
       if(m.type==='image'){
         content.innerHTML = `<img id="img_${m.id}" src="${m.url}" class="w-full max-w-sm rounded-xl object-cover mt-1">`;
-        content.querySelector(`#img_${m.id}`)?.addEventListener('load', ()=> scrollToLatest(false), { once:true });
+        content.querySelector(`#img_${m.id}`)?.addEventListener('load', ()=> {
+          if (isAtBottom()) {
+            scrollToLatest(false);
+          }
+        }, { once:true });
       }else if(m.type==='video'){
         content.innerHTML = `<video id="vid_${m.id}" src="${m.url}" controls playsinline class="w-full max-w-sm rounded-xl object-cover mt-1"></video>`;
       }else{
