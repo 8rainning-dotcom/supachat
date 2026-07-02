@@ -383,7 +383,18 @@ async function sendText(){
     read_by: { [currentUser.id]: true }
   }]);
 
-  if(notifyChk.checked) google.script.run.sendNotifyEmail(otherEmailOf(currentUser.email));
+  if(notifyChk.checked) {
+  // 🌟 อย่าลืมเอาลิงก์ Web App ที่ได้จาก Google Apps Script มาวางในเครื่องหมายคำพูดนี้นะคะ
+  const GAS_URL = "https://script.google.com/macros/s/AKfycbyjf8ZWwIfwTMOdXnOqoCmMdUEukgotAyQmdTmbOSF0RvFIKZ12ifXpV7_Mso1Agonx4w/exec"; 
+  
+  fetch(GAS_URL, {
+    method: 'POST',
+    body: JSON.stringify({ to: otherEmailOf(currentUser.email) }),
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
+  })
+  .then(res => res.json())
+  .then(data => console.log("ส่งเมล:", data))
+  .catch(err => console.error("Error:", err));
 }
 
 sendBtn.addEventListener('click', sendText);
@@ -414,7 +425,19 @@ async function uploadAndSend(file){
         type: kind, url: publicUrl, read_by: { [currentUser.id]: true }
       }]);
 
-      if(notifyChk.checked) google.script.run.sendNotifyEmail(otherEmailOf(currentUser.email));
+      if(notifyChk.checked) {
+        // 🌟 ลิงก์ Web App ของพี่ใส่ไว้ถูกต้องแล้วค่ะ
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbyjf8ZWwIfwTMOdXnQqoCmMdUEukgotAyQmdTmbOSF0RvFIKZ12ifXpV7_Mso1Agonx4w/exec"; 
+        
+        fetch(GAS_URL, {
+          method: 'POST',
+          body: JSON.stringify({ to: otherEmailOf(currentUser.email) }),
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' } 
+        })
+        .then(res => res.json())
+        .then(data => console.log("ส่งเมล:", data))
+        .catch(err => console.error("Error:", err));
+      }
   } catch (error) {
       showModal('อัปโหลดไฟล์ไม่สำเร็จ ลองใหม่อีกครั้งนะคะ', 'ข้อผิดพลาด');
   } finally {
